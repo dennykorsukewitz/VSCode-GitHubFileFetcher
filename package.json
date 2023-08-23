@@ -1,0 +1,107 @@
+{
+  "name": "GitHubFileFetcher",
+  "displayName": "GitHub File Fetcher",
+  "description": "This extension searches and fetches files from GitHub.",
+  "version": "1.0.0",
+  "publisher": "dennykorsukewitz",
+  "icon": "doc/images/icon.png",
+  "license": "SEE LICENSE IN LICENSE",
+  "homepage": "https://github.com/dennykorsukewitz/VSCode-GitHubFileFetcher/blob/dev/README.md",
+  "pricing": "Free",
+  "bugs": {
+    "url": "https://github.com/dennykorsukewitz/VSCode-GitHubFileFetcher/issues",
+    "email": "dennykorsukewitz@gmail.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dennykorsukewitz/VSCode-GitHubFileFetcher"
+  },
+  "sponsor": {
+    "url": "https://github.com/sponsors/dennykorsukewitz"
+  },
+  "keywords": [
+    "github",
+    "file",
+    "files",
+    "fetch",
+    "fetcher"
+  ],
+  "categories": [
+    "Other"
+  ],
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "activationEvents": [
+    "onCommand:gitHubFileFetcher"
+  ],
+  "main": "./src/extension",
+  "scripts": {
+    "lint": "eslint .",
+    "lint-fix": "eslint . --fix",
+    "test": "node ./test/runTest.js"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.1",
+    "@types/node": "16.x",
+    "@types/vscode": "^1.74.0",
+    "@vscode/test-electron": "^2.2.0",
+    "eslint": "^8.28.0",
+    "mocha": "^10.1.0",
+    "typescript": "^4.9.3"
+  },
+  "dependencies": {
+    "glob": "^8.1.0",
+    "node-fetch": "^2.6.9",
+    "path": "^0.12.7"
+  },
+  "vsce": {
+    "dependencies": true
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "gitHubFileFetcher",
+        "title": "Searches and fetches files from GitHub.",
+        "category": "GitHubFileFetcher"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "gitHubFileFetcher",
+        "key": "ctrl+alt+k f"
+      }
+    ],
+    "configuration": {
+      "type": "object",
+      "title": "GitHub File Fetcher",
+      "properties": {
+        "gitHubFileFetcher.informationMessages": {
+          "type": "string",
+          "description": "Information messages will be displayed.",
+          "default": "true",
+          "enum": [
+            "false",
+            "true",
+            "verbose"
+          ],
+          "enumDescriptions": [
+            "No, nothing will be displayed.",
+            "Yes, the normal information will be displayed.",
+            "Yes, all the information will be displayed."
+          ]
+        },
+        "gitHubFileFetcher.repositories": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "List of possible GitHub repositories. GitHub {owner}/{repo}.",
+          "default": [
+            "dennykorsukewitz/VSCode-GitHubFileFetcher"
+          ]
+        }
+      }
+    }
+  }
+}
