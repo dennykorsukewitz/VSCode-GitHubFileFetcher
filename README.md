@@ -17,30 +17,35 @@
 
 ## Feature
 
-**1. GitHubFileFetcher (1/5):** Fetching GitHub Repositories.
+**1. GitHubFileFetcher (1/6):** Fetching GitHub Repositories.
 
     This function allows you to search for GitHub owners or GitHub repositories.
     The search results (owner/repository) are then displayed.
 
-**2. GitHubFileFetcher (2/5):** Fetching branches.
+**2. GitHubFileFetcher (2/6):** Fetching branches.
 
     After selecting the repository, all possible branches are displayed.
 
-**3. GitHubFileFetcher (3/5):** Fetching files.
+**3. GitHubFileFetcher (3/6):** Fetching files.
 
     After that, select the desired file.
 
-**4. GitHubFileFetcher (4/5):** Fetching destination folder.
+**4. GitHubFileFetcher (4/6):** Fetching destination folder.
 
     Finally, the destination folder must be selected.
 
-**5. GitHubFileFetcher (5/5):** Added file.
+**5. GitHubFileFetcher (5/6):** Enter or change destination file path...
+
+    Enter or change destination file path.
+
+**6. GitHubFileFetcher (6/6):** Added file.
 
     `Hocus Pocus` - The file was created at the desired location.
 
-**5. GitHubFileFetcher:** Should I save the new repository in the settings?
+**GitHubFileFetcher:** Should I save the new repository in the settings?
 
-    So that you don't have to search for the repositories again and again, you can save the currently used one in the settings.
+    So that you don't have to search for the repositories again and again,
+    you can save the currently used one in the settings.
 
 **Shortcut:** ```strg + alt + k, f```<br>
 **Command:**  ```GitHubFileFetcher: Searches and fetches files from GitHub.```

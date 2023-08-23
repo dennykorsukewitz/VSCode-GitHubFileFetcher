@@ -37,7 +37,7 @@ function initGitHubFileFetcher(context) {
             searchOwnerString = '[Search Owner]',
             searchRepoString = '[Search Repository]',
             config = vscode.workspace.getConfiguration('gitHubFileFetcher'),
-            repositories = config.repositories;
+            repositories = Object.assign([], config.repositories);
 
         if (!repositories.includes(searchRepoString)) {
             repositories.unshift(searchRepoString);
@@ -49,10 +49,10 @@ function initGitHubFileFetcher(context) {
 
         // Create Owner/Repository Selection.
         if (config.informationMessages != 'false' ) {
-            vscode.window.showInformationMessage(`GitHubFileFetcher (1/5): Fetching GitHub repositories.`);
+            vscode.window.showInformationMessage(`GitHubFileFetcher (1/6): Fetching GitHub repositories.`);
         }
         let ownerRepository = await vscode.window.showQuickPick(repositories, {
-            title: 'GitHubFileFetcher (1/5)',
+            title: 'GitHubFileFetcher (1/6)',
             placeHolder: 'GitHubFileFetcher: Search/Select GitHub repositories...',
             canPickMany: false,
         });
@@ -78,7 +78,7 @@ function initGitHubFileFetcher(context) {
             placeHolder = `GitHubFileFetcher: Search for GitHub ${value}...`;
 
             let searchString = await vscode.window.showInputBox({
-                title: 'GitHubFileFetcher (1/5)',
+                title: 'GitHubFileFetcher (1/6)',
                 placeHolder: placeHolder,
                 value: value,
                 prompt: message,
@@ -104,7 +104,7 @@ function initGitHubFileFetcher(context) {
 
             if (foundRepositories){
                 ownerRepository = await vscode.window.showQuickPick(foundRepositories, {
-                    title: 'GitHubFileFetcher (1/5)',
+                    title: 'GitHubFileFetcher (1/6)',
                     placeHolder: 'GitHubFileFetcher: Select GitHub repositories...',
                     canPickMany: false,
                 });
@@ -118,9 +118,9 @@ function initGitHubFileFetcher(context) {
         // Create Branch Selection.
         url = `https://api.github.com/repos/${ownerRepository}/branches`;
         if (config.informationMessages != 'false' ) {
-            let message = `GitHubFileFetcher (2/5): Fetching branches.`;
+            let message = `GitHubFileFetcher (2/6): Fetching branches.`;
             if (config.informationMessages == 'verbose' ) {
-                message = `GitHubFileFetcher (2/5): Fetching branches from "${url}".`;
+                message = `GitHubFileFetcher (2/6): Fetching branches from "${url}".`;
             }
             vscode.window.showInformationMessage(message);
         }
@@ -139,7 +139,7 @@ function initGitHubFileFetcher(context) {
         });
 
         const branch = await vscode.window.showQuickPick(branches.reverse(), {
-            title: 'GitHubFileFetcher (2/5)',
+            title: 'GitHubFileFetcher (2/6)',
             placeHolder: 'GitHubFileFetcher: Select branch...',
             canPickMany: false,
         });
@@ -149,9 +149,9 @@ function initGitHubFileFetcher(context) {
         url = `https://api.github.com/repos/${ownerRepository}/git/trees/${branch}?recursive=1`
 
         if (config.informationMessages != 'false' ) {
-            let message = `GitHubFileFetcher (3/5): Fetching files.`;
+            let message = `GitHubFileFetcher (3/6): Fetching files.`;
             if (config.informationMessages == 'verbose' ) {
-                message = `GitHubFileFetcher (3/5): Fetching files from "${url}".`;
+                message = `GitHubFileFetcher (3/6): Fetching files from "${url}".`;
             }
             vscode.window.showInformationMessage(message)
         }
@@ -171,7 +171,7 @@ function initGitHubFileFetcher(context) {
         });
 
         let file = await vscode.window.showQuickPick(files, {
-            title: 'GitHubFileFetcher (3/5)',
+            title: 'GitHubFileFetcher (3/6)',
             placeHolder: 'GitHubFileFetcher: Select file...',
             canPickMany: false,
         });
@@ -184,12 +184,12 @@ function initGitHubFileFetcher(context) {
         })
 
         if (config.informationMessages != 'false' ) {
-            vscode.window.showInformationMessage(`GitHubFileFetcher (4/5): Fetching destination folder.`);
+            vscode.window.showInformationMessage(`GitHubFileFetcher (4/6): Fetching destination workspace.`);
         }
 
         let workspaceFolder = await vscode.window.showQuickPick(workspaceFolders, {
-            title: 'GitHubFileFetcher (4/5)',
-            placeHolder: 'GitHubFileFetcher: Select destination folder...',
+            title: 'GitHubFileFetcher (4/6)',
+            placeHolder: 'GitHubFileFetcher: Select destination workspace...',
             canPickMany: false,
         });
         if (!workspaceFolder) {
@@ -224,6 +224,14 @@ function initGitHubFileFetcher(context) {
         }
 
         const wsEdit = new vscode.WorkspaceEdit();
+
+        file = await vscode.window.showInputBox({
+            title: 'GitHubFileFetcher (5/6)',
+            placeHolder: `GitHubFileFetcher: Enter or change destination file path...`,
+            value: file,
+            prompt: `GitHubFileFetcher: Enter or change destination file path...`,
+        });
+
         const filePath = vscode.Uri.file(workspaceFolder + '/' + file);
 
         if (!filePath) {
@@ -237,7 +245,7 @@ function initGitHubFileFetcher(context) {
         // Apply all changes.
         vscode.workspace.applyEdit(wsEdit);
         if (config.informationMessages != 'false' ) {
-            vscode.window.showInformationMessage(`GitHubFileFetcher (5/5): Added file ${filePath.path} `);
+            vscode.window.showInformationMessage(`GitHubFileFetcher (6/6): Added file ${filePath.path} `);
         }
 
         if (newRepoFound) {
