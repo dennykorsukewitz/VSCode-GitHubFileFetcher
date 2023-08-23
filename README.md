@@ -17,6 +17,8 @@
 
 ## Feature
 
+The following steps are performed one after the other.
+
 **1. GitHubFileFetcher (1/6):** Fetching GitHub Repositories.
 
     This function allows you to search for GitHub owners or GitHub repositories.
