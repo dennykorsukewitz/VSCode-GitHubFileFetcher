@@ -34,8 +34,8 @@ function initGitHubFileFetcher(context) {
             response,
             json,
             newRepoFound = 0,
-            searchOwnerString = '[Search Owner]',
-            searchRepoString = '[Search Repository]',
+            searchOwnerString = '-- Search Owner --',
+            searchRepoString = '-- Search Repository --',
             config = vscode.workspace.getConfiguration('gitHubFileFetcher'),
             repositories = Object.assign([], config.repositories);
 
