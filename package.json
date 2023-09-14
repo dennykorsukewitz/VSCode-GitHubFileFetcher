@@ -2,7 +2,7 @@
   "name": "GitHubFileFetcher",
   "displayName": "GitHub File Fetcher",
   "description": "This extension searches and fetches files from GitHub.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "dennykorsukewitz",
   "icon": "doc/images/icon.png",
   "license": "SEE LICENSE IN LICENSE",
@@ -24,7 +24,10 @@
     "file",
     "files",
     "fetch",
-    "fetcher"
+    "fetcher",
+    "grab",
+    "download",
+    "get"
   ],
   "categories": [
     "Other"
