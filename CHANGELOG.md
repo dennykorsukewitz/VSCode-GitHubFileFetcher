@@ -6,3 +6,9 @@ All notable changes to the "GitHubFileFetcher" extension will be documented in t
 
 - Improved VSCode Marketplace keywords.
 - Applied common add style.
+
+## [1.0.0]
+
+### Initial release of GitHubFileFetcher extension
+
+**GitHubFileFetcher** is an extension that searches and fetches files from GitHub.
