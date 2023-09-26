@@ -4,6 +4,8 @@ All notable changes to the "GitHubFileFetcher" extension will be documented in t
 
 ## [1.0.1]
 
+### Maintenance
+
 - Improved VSCode Marketplace keywords.
 - Applied common add style.
 
