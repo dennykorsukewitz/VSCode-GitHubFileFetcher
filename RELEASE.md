@@ -1,4 +1,4 @@
-# [1.0.1]
+# [1.0.2]
 
-- Improved VSCode Marketplace keywords.
-- Applied common add style.
+- Tidied code.
+- Saves the new manually entered repository globally.

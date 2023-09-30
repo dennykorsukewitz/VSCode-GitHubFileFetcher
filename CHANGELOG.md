@@ -2,6 +2,13 @@
 
 All notable changes to the "GitHubFileFetcher" extension will be documented in this file.
 
+## [1.0.2]
+
+### Maintenance
+
+- Tidied code.
+- Saves the new manually entered repository globally.
+
 ## [1.0.1]
 
 ### Maintenance

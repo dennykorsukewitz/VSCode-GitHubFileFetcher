@@ -48,7 +48,7 @@ function initGitHubFileFetcher(context) {
         }
 
         // Create Owner/Repository Selection.
-        if (config.informationMessages != 'false' ) {
+        if (config.informationMessages != 'false') {
             vscode.window.showInformationMessage(`GitHubFileFetcher (1/6): Fetching GitHub repositories.`);
         }
         let ownerRepository = await vscode.window.showQuickPick(repositories, {
@@ -60,20 +60,20 @@ function initGitHubFileFetcher(context) {
         if (!ownerRepository) return;
 
         let foundRepositories = [];
-        if (ownerRepository == searchOwnerString || ownerRepository == searchRepoString){
+        if (ownerRepository == searchOwnerString || ownerRepository == searchRepoString) {
 
             let message,
                 value,
                 placeHolder,
                 url = `https://api.github.com/search/repositories?q=`;
 
-            if (ownerRepository == searchOwnerString){
-                value       = 'Owner';
-                message     = `Enter GitHub ${value}. Example: dennykorsukewitz`;
+            if (ownerRepository == searchOwnerString) {
+                value = 'Owner';
+                message = `Enter GitHub ${value}. Example: dennykorsukewitz`;
             }
             else if (ownerRepository == searchRepoString) {
-                value       = 'Repositories';
-                message     = `Enter GitHub ${value} Example: VSCode-GitHubFileFetcher`;
+                value = 'Repositories';
+                message = `Enter GitHub ${value} Example: VSCode-GitHubFileFetcher`;
             }
             placeHolder = `GitHubFileFetcher: Search for GitHub ${value}...`;
 
@@ -84,14 +84,14 @@ function initGitHubFileFetcher(context) {
                 prompt: message,
             });
 
-            if (ownerRepository == searchOwnerString){
+            if (ownerRepository == searchOwnerString) {
                 searchString += '/';
             }
 
             url += `${searchString}`;
 
             // Log.
-            if (config.informationMessages == 'verbose' ) {
+            if (config.informationMessages == 'verbose') {
                 vscode.window.showInformationMessage(`GitHubFileFetcher: Fetching ${value} from url: "${url}".`);
             }
 
@@ -102,7 +102,7 @@ function initGitHubFileFetcher(context) {
                 foundRepositories.push(json.items[index].full_name);
             });
 
-            if (foundRepositories){
+            if (foundRepositories) {
                 ownerRepository = await vscode.window.showQuickPick(foundRepositories, {
                     title: 'GitHubFileFetcher (1/6)',
                     placeHolder: 'GitHubFileFetcher: Select GitHub repositories...',
@@ -117,9 +117,9 @@ function initGitHubFileFetcher(context) {
 
         // Create Branch Selection.
         url = `https://api.github.com/repos/${ownerRepository}/branches`;
-        if (config.informationMessages != 'false' ) {
+        if (config.informationMessages != 'false') {
             let message = `GitHubFileFetcher (2/6): Fetching branches.`;
-            if (config.informationMessages == 'verbose' ) {
+            if (config.informationMessages == 'verbose') {
                 message = `GitHubFileFetcher (2/6): Fetching branches from "${url}".`;
             }
             vscode.window.showInformationMessage(message);
@@ -148,9 +148,9 @@ function initGitHubFileFetcher(context) {
         // Get all possible files.
         url = `https://api.github.com/repos/${ownerRepository}/git/trees/${branch}?recursive=1`
 
-        if (config.informationMessages != 'false' ) {
+        if (config.informationMessages != 'false') {
             let message = `GitHubFileFetcher (3/6): Fetching files.`;
-            if (config.informationMessages == 'verbose' ) {
+            if (config.informationMessages == 'verbose') {
                 message = `GitHubFileFetcher (3/6): Fetching files from "${url}".`;
             }
             vscode.window.showInformationMessage(message)
@@ -183,7 +183,7 @@ function initGitHubFileFetcher(context) {
             workspaceFolders.push(workspaceFolder.uri.path)
         })
 
-        if (config.informationMessages != 'false' ) {
+        if (config.informationMessages != 'false') {
             vscode.window.showInformationMessage(`GitHubFileFetcher (4/6): Fetching destination workspace.`);
         }
 
@@ -201,7 +201,7 @@ function initGitHubFileFetcher(context) {
         url = `https://api.github.com/repos/${ownerRepository}/contents/${file}?ref=${branch}`;
 
         // Log.
-        if (config.informationMessages == 'verbose' ) {
+        if (config.informationMessages == 'verbose') {
             vscode.window.showInformationMessage(`GitHubFileFetcher: Fetching file data for file: "${file}" from branch: "${branch}" from url: "${url}".`);
         }
 
@@ -219,7 +219,7 @@ function initGitHubFileFetcher(context) {
         }
 
         // Log.
-        if (config.informationMessages == 'verbose' ) {
+        if (config.informationMessages == 'verbose') {
             vscode.window.showInformationMessage(`GitHubFileFetcher: Decoded file: "${file}" from branch: "${branch}".`);
         }
 
@@ -244,20 +244,23 @@ function initGitHubFileFetcher(context) {
 
         // Apply all changes.
         vscode.workspace.applyEdit(wsEdit);
-        if (config.informationMessages != 'false' ) {
+        if (config.informationMessages != 'false') {
             vscode.window.showInformationMessage(`GitHubFileFetcher (6/6): Added file ${filePath.path} `);
         }
 
         if (newRepoFound) {
-            let addNewRepoToConfig = await vscode.window.showQuickPick(['yes','no'], {
+            let addNewRepoToConfig = await vscode.window.showQuickPick(['yes', 'no'], {
                 title: 'GitHubFileFetcher (New Repository)',
                 placeHolder: 'GitHubFileFetcher: Should I save the new repository in the settings?',
                 canPickMany: false,
             });
 
-            if (addNewRepoToConfig == 'yes'){
-                config.repositories.push(ownerRepository);
-                await vscode.workspace.getConfiguration().update('gitHubFileFetcher.repositories', config.repositories);
+            if (addNewRepoToConfig == 'yes') {
+
+                let configRepositories = config.repositories;
+                configRepositories.push(ownerRepository);
+
+                await vscode.workspace.getConfiguration().update('gitHubFileFetcher.repositories', configRepositories, true);
             }
         }
     }))
