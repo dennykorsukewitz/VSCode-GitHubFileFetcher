@@ -60,8 +60,8 @@ The following steps are performed one after the other.
 
 | Name | Description | Default Value |
 | - | - | - |
-| GitHubFileFetcher.informationMessages | Information messages will be displayed. | true |
-| GitHubFileFetcher.repositories | List of possible GitHub repositories. GitHub {owner}/{repo}. | dennykorsukewitz/VSCode-GitHubFileFetcher |
+| gitHubFileFetcher.informationMessages | Information messages will be displayed. | true |
+| gitHubFileFetcher.repositories | List of possible GitHub repositories. GitHub {owner}/{repo}. | dennykorsukewitz/VSCode-GitHubFileFetcher |
 
 ![Settings](doc/images/settings.png)
 
