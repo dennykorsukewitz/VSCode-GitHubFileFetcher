@@ -2,7 +2,7 @@
   "name": "GitHubFileFetcher",
   "displayName": "GitHub File Fetcher",
   "description": "This extension searches and fetches files from GitHub.",
-  "version": "1.0.1",
+  "version": "2.0.0",
   "publisher": "dennykorsukewitz",
   "icon": "doc/images/icon.png",
   "license": "SEE LICENSE IN LICENSE",
@@ -33,33 +33,43 @@
     "Other"
   ],
   "engines": {
-    "vscode": "^1.74.0"
+    "vscode": "^1.85.0"
   },
-  "activationEvents": [
-    "onCommand:gitHubFileFetcher"
-  ],
-  "main": "./src/extension",
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "browser": "./dist/extension.js",
   "scripts": {
-    "lint": "eslint .",
-    "lint-fix": "eslint . --fix",
-    "test": "node ./test/runTest.js"
-  },
-  "devDependencies": {
-    "@types/mocha": "^10.0.1",
-    "@types/node": "16.x",
-    "@types/vscode": "^1.74.0",
-    "@vscode/test-electron": "^2.2.0",
-    "eslint": "^8.28.0",
-    "mocha": "^10.1.0",
-    "typescript": "^4.9.3"
+    "vscode:prepublish": "npm run esbuild-base -- --minify",
+    "esbuild-base": "esbuild ./src/extension.ts --bundle --outfile=dist/extension.js --external:vscode --format=cjs --platform=node",
+    "esbuild": "npm run esbuild-base -- --sourcemap",
+    "esbuild-watch": "npm run esbuild-base -- --sourcemap --watch",
+    "watch": "tsc -watch -p ./",
+    "compile": "tsc -p ./",
+    "compile-web": "npm run esbuild-base -- --sourcemap",
+    "lint": "eslint src --ext ts",
+    "lint-fix": "eslint src --ext ts --fix",
+    "pretest": "rm -Rf .vscode-test && npm run compile && npm run lint",
+    "test": "node ./dist/test/runTest.js",
+    "open-in-browser": "npm run compile-web && npx @vscode/test-web --extensionDevelopmentPath=."
   },
   "dependencies": {
-    "glob": "^8.1.0",
-    "node-fetch": "^2.6.9",
-    "path": "^0.12.7"
+    "base64-to-uint8array": "^1.0.0"
   },
-  "vsce": {
-    "dependencies": true
+  "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.1",
+    "@types/node": "^18.19.14",
+    "@types/vscode": "^1.85.0",
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.20.0",
+    "esbuild": "^0.20.0",
+    "eslint": "^8.56.0",
+    "mocha": "^10.2.0",
+    "typescript": "^5.3.3"
+  },
+  "overrides": {
+    "minimatch": "5.1.2",
+    "glob": "8.1.0"
   },
   "contributes": {
     "commands": [
@@ -80,6 +90,7 @@
       "title": "GitHub File Fetcher",
       "properties": {
         "gitHubFileFetcher.informationMessages": {
+          "order": 1,
           "type": "string",
           "description": "Information messages will be displayed.",
           "default": "true",
@@ -95,6 +106,7 @@
           ]
         },
         "gitHubFileFetcher.repositories": {
+          "order": 2,
           "type": "array",
           "items": {
             "type": "string"
@@ -103,6 +115,16 @@
           "default": [
             "dennykorsukewitz/VSCode-GitHubFileFetcher"
           ]
+        },
+        "gitHubFileFetcher.githubUsername": {
+          "order": 3,
+          "type": "string",
+          "description": "The GitHub API is limited to 60 requests per hour for non authorized requests. You can provide your GitHub username and an access token to push this limit to 5000 requests per hour."
+        },
+        "gitHubFileFetcher.githubToken": {
+          "order": 4,
+          "type": "string",
+          "description": "The GitHub API is limited to 60 requests per hour for non authorized requests. You can provide your GitHub username and an access token to push this limit to 5000 requests per hour."
         }
       }
     }

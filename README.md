@@ -13,7 +13,7 @@
 
 | Status |
  | ------ |
-| [![GitHub commits since tagged version](https://img.shields.io/github/commits-since/dennykorsukewitz/VSCode-GitHubFileFetcher/1.0.1/dev)](https://github.com/dennykorsukewitz/VSCode-GitHubFileFetcher/compare/1.0.1...dev) ![GitHub Workflow Lint](https://github.com/dennykorsukewitz/VSCode-GitHubFileFetcher/actions/workflows/lint.yml/badge.svg?branch=dev&style=flat&label=Lint) ![GitHub Workflow Pages](https://github.com/dennykorsukewitz/VSCode-GitHubFileFetcher/actions/workflows/pages.yml/badge.svg?branch=dev&style=flat&label=GitHub%20Pages) |
+| [![GitHub commits since tagged version](https://img.shields.io/github/commits-since/dennykorsukewitz/VSCode-GitHubFileFetcher/2.0.0/dev)](https://github.com/dennykorsukewitz/VSCode-GitHubFileFetcher/compare/2.0.0...dev) ![GitHub Workflow Lint](https://github.com/dennykorsukewitz/VSCode-GitHubFileFetcher/actions/workflows/lint.yml/badge.svg?branch=dev&style=flat&label=Lint) ![GitHub Workflow Pages](https://github.com/dennykorsukewitz/VSCode-GitHubFileFetcher/actions/workflows/pages.yml/badge.svg?branch=dev&style=flat&label=GitHub%20Pages) |
 
 ## Feature
 
@@ -62,6 +62,11 @@ The following steps are performed one after the other.
 | - | - | - |
 | gitHubFileFetcher.informationMessages | Information messages will be displayed. | true |
 | gitHubFileFetcher.repositories | List of possible GitHub repositories. GitHub {owner}/{repo}. | dennykorsukewitz/VSCode-GitHubFileFetcher |
+| gitHubFileFetcher.githubUsername | GitHub username | dennykorsukewitz |
+| gitHubFileFetcher.githubToken | GitHub token | 123xxx789 |
+
+The GitHub API is limited to 60 requests per hour for non authorized requests. You can provide your GitHub username and an access token to push this limit to 5000 requests per hour. Please see the [official GitHub doc](https://docs.github.com/en/free-pro-team@latest/rest/rate-limit/rate-limit?apiVersion=2022-11-28) for further information.
+You can generate the access token in your [GitHub settings](https://github.com/settings/tokens).
 
 ![Settings](doc/images/settings.png)
 
