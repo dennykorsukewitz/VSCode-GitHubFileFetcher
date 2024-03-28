@@ -4,6 +4,10 @@
 
 **GitHubFileFetcher** is an extension that searches and fetches files from GitHub.
 
+GitHubFileFetcher is a powerful extension for Visual Studio Code that can help you save time and increase your productivity. With its simple and intuitive interface, you can easily search for files and repositories on GitHub without leaving your workspace. Whether you are a seasoned developer or just starting out, GitHubFileFetcher is an excellent tool to add to your VS Code arsenal.
+
+So, try it out and see how it can improve your workflow!
+
 | Repository | GitHub | Visual Studio Marketplace |
 | ------ | ------ | ------ |
 | ![GitHub release (latest by date)](https://img.shields.io/github/v/release/dennykorsukewitz/VSCode-GitHubFileFetcher) | ![GitHub open issues](https://img.shields.io/github/issues/dennykorsukewitz/VSCode-GitHubFileFetcher) ![GitHub closed issues](https://img.shields.io/github/issues-closed/dennykorsukewitz/VSCode-GitHubFileFetcher?color=#44CC44) | ![Visual Studio Marketplace last-updated](https://img.shields.io/visual-studio-marketplace/last-updated/dennykorsukewitz.GitHubFileFetcher) ![Visual Studio Marketplace Version ](https://img.shields.io/visual-studio-marketplace/v/dennykorsukewitz.GitHubFileFetcher) |
