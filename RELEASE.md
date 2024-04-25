@@ -3,4 +3,3 @@
 ## Changed
 
 - Updated icon.
-
