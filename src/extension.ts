@@ -292,6 +292,7 @@ async function getDestinationFilePath(context: vscode.ExtensionContext) {
 
     let overwriteExistingFile = false;
     if (await vscode.workspace.fs.stat(destinationFilePath)) {
+
         let confirmOverwrite = await vscode.window.showQuickPick(['yes', 'no'], {
             title: 'GitHubFileFetcher (Overwrite)',
             placeHolder: 'GitHubFileFetcher: Destination file already exists. Overwrite?',
