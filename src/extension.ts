@@ -33,12 +33,12 @@ export function activate(context: vscode.ExtensionContext) {
 
 async function startGitHubFileFetcher(context: vscode.ExtensionContext) {
 
-
     vscode.window.withProgress({
         location: vscode.ProgressLocation.Notification,
         title: "GitHubFileFetcher",
         cancellable: true
     }, async (progress, token) => {
+
         token.onCancellationRequested(() => {
             console.log("User canceled the long running operation");
         });
