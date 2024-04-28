@@ -317,7 +317,7 @@ async function getDestinationFilePath(context: vscode.ExtensionContext) {
                 }
             }
 
-            vscode.window.showErrorMessage(`GitHubFileFetcher: Destination file already exists.`);
+            vscode.window.showErrorMessage(`GitHubFileFetcher (5/6): Destination file already exists.`);
             destinationFile = await vscode.window.showInputBox({
                 title: 'GitHubFileFetcher (5/6)',
                 placeHolder: `GitHubFileFetcher: Enter or change destination file path...`,
@@ -329,7 +329,7 @@ async function getDestinationFilePath(context: vscode.ExtensionContext) {
     }
 
     if (!destinationFilePath) {
-        vscode.window.showErrorMessage(`GitHubFileFetcher: No filePath exists.`);
+        vscode.window.showErrorMessage(`GitHubFileFetcher (5/6): No filePath exists.`);
         return;
     }
 
