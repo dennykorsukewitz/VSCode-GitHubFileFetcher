@@ -35,7 +35,9 @@
   "engines": {
     "vscode": "^1.85.0"
   },
-  "activationEvents": [],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "main": "./dist/extension.js",
   "browser": "./dist/extension.js",
   "scripts": {
@@ -95,10 +97,12 @@
           "description": "Information messages will be displayed.",
           "default": "true",
           "enum": [
+            "false",
             "true",
             "verbose"
           ],
           "enumDescriptions": [
+            "No, nothing will be displayed.",
             "Yes, the normal information will be displayed.",
             "Yes, all the information will be displayed."
           ]

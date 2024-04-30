@@ -24,7 +24,9 @@ let url,
 export function activate(context: vscode.ExtensionContext) {
 
     // This function searches and fetches files from GitHub.
-    let startDisposable = vscode.commands.registerCommand('gitHubFileFetcher', () => {
+
+    // TODO: Add .start to command.
+    let startCommand = vscode.commands.registerCommand('gitHubFileFetcher', () => {
         startGitHubFileFetcher(context);
     });
 
@@ -33,42 +35,90 @@ export function activate(context: vscode.ExtensionContext) {
 
 async function startGitHubFileFetcher(context: vscode.ExtensionContext) {
 
-    vscode.window.withProgress({
-        location: vscode.ProgressLocation.Notification,
-        title: "GitHubFileFetcher",
-        cancellable: true
-    }, async (progress, token) => {
+    if (config.informationMessages !== 'false') {
 
-        token.onCancellationRequested(() => {
-            console.log("User canceled the long running operation");
+        vscode.window.withProgress({
+            location: vscode.ProgressLocation.Notification,
+            title: "GitHubFileFetcher",
+            cancellable: true
+        }, async (progress, token) => {
+
+            token.onCancellationRequested(() => {
+                console.log("User canceled the long running operation");
+            });
+
+            // Prepare the extension.
+            progress.report({ increment: 0, message: "(0/6): Prepare..." });
+            await pre(context);
+
+            // Get the GitHub Owner/Repository.
+            progress.report({ increment: 15, message: "(1/6): Fetching GitHub repositories." });
+            ownerRepository = await getOwnerRepository(context) as string;
+            if (!ownerRepository) { return; }
+
+            // Get the GitHub Branch.
+            progress.report({ increment: 15, message: "(2/6): Fetching branches." });
+            branch = await getBranch(context) as string;
+            if (!branch) { return; }
+
+            // Get the GitHub File.
+            progress.report({ increment: 15, message: "(3/6): Fetching files." });
+            file = await getFile(context) as string;
+            if (!file) { return; }
+
+            // Get the destination workspace folder.
+            progress.report({ increment: 15, message: "(4/6): Fetching destination workspace." });
+            workspaceFolder = await getWorkspaceFolder(context) as string;
+            if (!workspaceFolder) { return; }
+
+            // Get the destination file path.
+            progress.report({ increment: 15, message: "(5/6): Enter destination file path." });
+            destinationFilePath = await getDestinationFilePath(context);
+            if (!destinationFilePath) { return; }
+
+            // Fetch the file content.
+            fileContent = await fetchFile(context) as unknown as string;
+            if (!fileContent) { return; }
+
+            // Add the file to the workspace folder.
+            progress.report({ increment: 25, message: `(6/6): Added file ${destinationFilePath.path}` });
+            await addFile(context);
+
+            // Add new repository to settings.
+            await addNewRepoToSetting(context);
+
+            // Done.
+            const promise = new Promise<void>(resolve => {
+                setTimeout(() => {
+                    resolve();
+                }, 4000);
+            });
+
+            return promise;
         });
 
+    }else{
+
         // Prepare the extension.
-        progress.report({ increment: 0, message: "(0/6): Prepare..." });
         await pre(context);
 
         // Get the GitHub Owner/Repository.
-        progress.report({ increment: 15, message: "(1/6): Fetching GitHub repositories." });
         ownerRepository = await getOwnerRepository(context) as string;
         if (!ownerRepository) { return; }
 
         // Get the GitHub Branch.
-        progress.report({ increment: 15, message: "(2/6): Fetching branches." });
         branch = await getBranch(context) as string;
         if (!branch) { return; }
 
         // Get the GitHub File.
-        progress.report({ increment: 15, message: "(3/6): Fetching files." });
         file = await getFile(context) as string;
         if (!file) { return; }
 
         // Get the destination workspace folder.
-        progress.report({ increment: 15, message: "(4/6): Fetching destination workspace." });
         workspaceFolder = await getWorkspaceFolder(context) as string;
         if (!workspaceFolder) { return; }
 
         // Get the destination file path.
-        progress.report({ increment: 15, message: "(5/6): Enter destination file path." });
         destinationFilePath = await getDestinationFilePath(context);
         if (!destinationFilePath) { return; }
 
@@ -77,21 +127,11 @@ async function startGitHubFileFetcher(context: vscode.ExtensionContext) {
         if (!fileContent) { return; }
 
         // Add the file to the workspace folder.
-        progress.report({ increment: 25, message: `(6/6): Added file ${destinationFilePath.path}` });
         await addFile(context);
 
         // Add new repository to settings.
         await addNewRepoToSetting(context);
-
-        // Done.
-        const promise = new Promise<void>(resolve => {
-            setTimeout(() => {
-                resolve();
-            }, 4000);
-        });
-
-        return promise;
-    });
+    }
 }
 
 function pre(context: vscode.ExtensionContext) {
@@ -196,8 +236,7 @@ async function getBranch(context: vscode.ExtensionContext) {
     // Create Branch Selection.
     url = `https://api.github.com/repos/${ownerRepository}/branches`;
     if (config.informationMessages === 'verbose') {
-        let message = `GitHubFileFetcher (2/6): Fetching branches from "${url}".`;
-        vscode.window.showInformationMessage(message);
+        vscode.window.showInformationMessage(`GitHubFileFetcher (2/6): Fetching branches from "${url}".`);
     }
 
     response = await fetch(url, options);
@@ -228,8 +267,7 @@ async function getFile(context: vscode.ExtensionContext) {
     url = `https://api.github.com/repos/${ownerRepository}/git/trees/${branch}?recursive=1`;
 
     if (config.informationMessages === 'verbose') {
-        let message = `GitHubFileFetcher (3/6): Fetching files from "${url}".`;
-        vscode.window.showInformationMessage(message);
+        vscode.window.showInformationMessage(`GitHubFileFetcher (3/6): Fetching files from "${url}".`);
     }
 
     response = await fetch(url, options);
@@ -237,7 +275,7 @@ async function getFile(context: vscode.ExtensionContext) {
     let files: string[] = [];
 
     if (json.message) {
-        vscode.window.showErrorMessage(`GitHubFileFetcher: ${json.message}.`);
+        vscode.window.showErrorMessage(`GitHubFileFetcher (3/6): ${json.message}.`);
         return;
     }
 
@@ -271,7 +309,7 @@ async function getWorkspaceFolder(context: vscode.ExtensionContext) {
         canPickMany: false,
     });
     if (!workspaceFolder) {
-        vscode.window.showErrorMessage(`GitHubFileFetcher: No Workspace Folder exists.`);
+        vscode.window.showErrorMessage(`GitHubFileFetcher (4/6): No Workspace Folder exists.`);
         return;
     }
 
