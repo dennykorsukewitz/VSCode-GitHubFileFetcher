@@ -2,38 +2,63 @@ import * as vscode from 'vscode';
 
 const toUint8Array = require('base64-to-uint8array');
 
-let url,
-    response,
-    json: any,
-    newRepoFound: Boolean = false,
+let newRepoFound: Boolean = false,
     searchOwnerString: string = '-- Search Owner --',
     searchRepoString: string = '-- Search Repository --',
     options: any = {},
     config = vscode.workspace.getConfiguration('gitHubFileFetcher'),
-    repositories = Object.assign([], config.repositories),
-    ownerRepository: string = '',
-    branch: any = '',
-    file: string = '',
-    workspaceFolder: string = '',
-    fileContent: any = '',
-    destinationFilePath: any = '';
+    repositories = Object.assign([], config.repositories);
+;
 
 /**
- * @param {vscode.ExtensionContext} context
+ * Activates the extension and registers commands and event listeners.
+ * @param context - The extension context.
  */
 export function activate(context: vscode.ExtensionContext) {
 
-    // This function searches and fetches files from GitHub.
-
-    // TODO: Add .start to command.
-    let startCommand = vscode.commands.registerCommand('gitHubFileFetcher', () => {
+    /**
+     * Command to start the GitHub File Fetcher.
+     * This function searches and fetches files from GitHub.
+     */
+    let startCommand = vscode.commands.registerCommand('gitHubFileFetcher.start', () => {
         startGitHubFileFetcher(context);
     });
 
-    context.subscriptions.push(startDisposable);
+    /**
+     * Command to check for updates.
+     */
+    let checkForUpdatesCommand = vscode.commands.registerCommand('gitHubFileFetcher.checkForUpdates', () => {
+        checkForUpdates(context);
+    });
+
+    /**
+     * Event listener for the `onDidChangeActiveTextEditor` event.
+     * Triggers the `checkForUpdates` function when the active text editor changes.
+     *
+     * @param {vscode.TextEditor | undefined} editor - The active text editor.
+     */
+    let checkForUpdatesOnDidChangeActiveTextEditor = vscode.window.onDidChangeActiveTextEditor((editor) => {
+        if (editor && config.checkForUpdates) {
+            checkForUpdates(context);
+        }
+    });
+
+    context.subscriptions.push(startCommand, checkForUpdatesCommand, checkForUpdatesOnDidChangeActiveTextEditor);
+
+    // Listen for configuration changes
+    handleConfigChange();
 }
 
+/**
+ * Starts the GitHub File Fetcher extension.
+ *
+ * @param context - The extension context.
+ * @returns A promise that resolves when the extension has finished running.
+ */
 async function startGitHubFileFetcher(context: vscode.ExtensionContext) {
+
+    newRepoFound = false;
+    options = getOptions();
 
     if (config.informationMessages !== 'false') {
 
@@ -49,43 +74,49 @@ async function startGitHubFileFetcher(context: vscode.ExtensionContext) {
 
             // Prepare the extension.
             progress.report({ increment: 0, message: "(0/6): Prepare..." });
-            await pre(context);
+            await pre();
 
             // Get the GitHub Owner/Repository.
             progress.report({ increment: 15, message: "(1/6): Fetching GitHub repositories." });
-            ownerRepository = await getOwnerRepository(context) as string;
+            let ownerRepository = await getOwnerRepository() as string;
             if (!ownerRepository) { return; }
 
             // Get the GitHub Branch.
             progress.report({ increment: 15, message: "(2/6): Fetching branches." });
-            branch = await getBranch(context) as string;
+            let branch = await getBranch({ownerRepository: ownerRepository}) as string;
             if (!branch) { return; }
 
             // Get the GitHub File.
             progress.report({ increment: 15, message: "(3/6): Fetching files." });
-            file = await getFile(context) as string;
+            let file = await getFile({ ownerRepository: ownerRepository, branch: branch }) as string;
             if (!file) { return; }
 
             // Get the destination workspace folder.
             progress.report({ increment: 15, message: "(4/6): Fetching destination workspace." });
-            workspaceFolder = await getWorkspaceFolder(context) as string;
+            let workspaceFolder = await getWorkspaceFolder() as string;
             if (!workspaceFolder) { return; }
 
             // Get the destination file path.
             progress.report({ increment: 15, message: "(5/6): Enter destination file path." });
-            destinationFilePath = await getDestinationFilePath(context);
-            if (!destinationFilePath) { return; }
+            let destination = await getDestination({ file: file, workspaceFolder: workspaceFolder });
+            if (!destination) { return; }
+
+            let destinationFile = destination.destinationFile;
+            let destinationFilePath = destination.destinationFilePath;
 
             // Fetch the file content.
-            fileContent = await fetchFile(context) as unknown as string;
+            let fileContent = await fetchFile({ ownerRepository: ownerRepository, file: file, branch: branch, }) as unknown as string;
             if (!fileContent) { return; }
 
             // Add the file to the workspace folder.
             progress.report({ increment: 25, message: `(6/6): Added file ${destinationFilePath.path}` });
-            await addFile(context);
+            await addFile({ destinationFilePath: destinationFilePath, fileContent: fileContent });
 
             // Add new repository to settings.
-            await addNewRepoToSetting(context);
+            await addNewRepoToSetting({ ownerRepository: ownerRepository });
+
+            // Add the workspace folders.
+            await setWorkspaceFolders(context, { workspaceFolder: workspaceFolder, destinationFile: destinationFile, ownerRepository: ownerRepository, branch: branch, file: file });
 
             // Done.
             const promise = new Promise<void>(resolve => {
@@ -100,41 +131,51 @@ async function startGitHubFileFetcher(context: vscode.ExtensionContext) {
     }else{
 
         // Prepare the extension.
-        await pre(context);
+        await pre();
 
         // Get the GitHub Owner/Repository.
-        ownerRepository = await getOwnerRepository(context) as string;
+        let ownerRepository = await getOwnerRepository() as string;
         if (!ownerRepository) { return; }
 
         // Get the GitHub Branch.
-        branch = await getBranch(context) as string;
+        let branch = await getBranch({ownerRepository: ownerRepository}) as string;
         if (!branch) { return; }
 
         // Get the GitHub File.
-        file = await getFile(context) as string;
+        let file = await getFile({ ownerRepository: ownerRepository, branch: branch }) as string;
         if (!file) { return; }
 
         // Get the destination workspace folder.
-        workspaceFolder = await getWorkspaceFolder(context) as string;
+        let workspaceFolder = await getWorkspaceFolder() as string;
         if (!workspaceFolder) { return; }
 
         // Get the destination file path.
-        destinationFilePath = await getDestinationFilePath(context);
-        if (!destinationFilePath) { return; }
+        let destination = await getDestination({ file: file, workspaceFolder: workspaceFolder });
+        if (!destination) { return; }
+
+        let destinationFile = destination.destinationFile;
+        let destinationFilePath = destination.destinationFilePath;
 
         // Fetch the file content.
-        fileContent = await fetchFile(context) as unknown as string;
+        let fileContent = await fetchFile({ ownerRepository: ownerRepository, file: file, branch: branch, }) as unknown as string;
         if (!fileContent) { return; }
 
         // Add the file to the workspace folder.
-        await addFile(context);
+        await addFile({ destinationFilePath: destinationFilePath, fileContent: fileContent });
 
         // Add new repository to settings.
-        await addNewRepoToSetting(context);
+        await addNewRepoToSetting({ ownerRepository: ownerRepository });
+
+        // Add the workspace folders.
+        await setWorkspaceFolders(context, { workspaceFolder: workspaceFolder, destinationFile: destinationFile, ownerRepository: ownerRepository, branch: branch, file: file });
     }
 }
 
-function pre(context: vscode.ExtensionContext) {
+/**
+ * Performs pre-processing tasks before fetching files from GitHub.
+ * Checks if a workspace folder is available and adds the search repository and owner to the repositories list if they are not already included.
+ */
+function pre() {
 
     // Return if no workspaceFolder is available
     if (!vscode.workspace.workspaceFolders) {
@@ -142,6 +183,44 @@ function pre(context: vscode.ExtensionContext) {
         vscode.commands.executeCommand('workbench.action.addRootFolder');
         return;
     }
+
+    if (!repositories.includes(searchRepoString)) {
+        repositories.unshift(searchRepoString);
+    }
+
+    if (!repositories.includes(searchOwnerString)) {
+        repositories.unshift(searchOwnerString);
+    }
+}
+
+/**
+* Listen for configuration change in `gitHubFileFetcher.history` or `gitHubFileFetcher.checkForUpdates` section
+* When anything changes in the section, show a prompt to reload
+* VSCode window via `workbench.action.reloadWindow` command
+*/
+function handleConfigChange() {
+    vscode.workspace.onDidChangeConfiguration(configChangeEvent => {
+
+        if (configChangeEvent.affectsConfiguration('gitHubFileFetcher.history') || configChangeEvent.affectsConfiguration('gitHubFileFetcher.checkForUpdates')) {
+        const actions = ['Reload now', 'Later'];
+
+        vscode.window.showInformationMessage('The VSCode window needs to reload for the changes to take effect. Would you like to reload the window now?', ...actions)
+            .then(action => {
+
+                if (action === actions[0]) {
+                    vscode.commands.executeCommand('workbench.action.reloadWindow');
+                }
+            });
+        }
+    });
+}
+
+/**
+ * Retrieves the options for making API requests to GitHub.
+ *
+ * @returns The options object containing the necessary headers for authentication.
+ */
+function getOptions() {
 
     if (
         config.githubUsername
@@ -155,16 +234,15 @@ function pre(context: vscode.ExtensionContext) {
         };
     }
 
-    if (!repositories.includes(searchRepoString)) {
-        repositories.unshift(searchRepoString);
-    }
-
-    if (!repositories.includes(searchOwnerString)) {
-        repositories.unshift(searchOwnerString);
-    }
+    return options;
 }
 
-async function getOwnerRepository(context: vscode.ExtensionContext) {
+/**
+ * Retrieves the owner and repository name from the user through a series of prompts and returns the selected repository.
+ * If the user chooses to search for repositories, it makes an API call to fetch the repositories and allows the user to select one.
+ * @returns The selected owner and repository name.
+ */
+async function getOwnerRepository() {
 
     let ownerRepository = await vscode.window.showQuickPick(repositories, {
         title: 'GitHubFileFetcher (1/6)',
@@ -205,13 +283,12 @@ async function getOwnerRepository(context: vscode.ExtensionContext) {
 
         url += `${searchString}`;
 
-        // Log.
         if (config.informationMessages === 'verbose') {
             vscode.window.showInformationMessage(`GitHubFileFetcher: Fetching ${value} from url: "${url}".`);
         }
 
-        response = await fetch(url, options);
-        json = await response.json();
+        let response = await fetch(url, options);
+        let json: any = await response.json();
 
         Object.keys(json.items).forEach(function (index) {
             foundRepositories.push(json.items[index].full_name);
@@ -231,16 +308,21 @@ async function getOwnerRepository(context: vscode.ExtensionContext) {
     return ownerRepository;
 }
 
-async function getBranch(context: vscode.ExtensionContext) {
+/**
+ * Fetches the branches from a GitHub repository and allows the user to select a branch.
+ * @param data - An object containing the owner and repository name.
+ * @returns A Promise that resolves to the selected branch.
+ */
+async function getBranch(data: { ownerRepository: any; }) {
 
     // Create Branch Selection.
-    url = `https://api.github.com/repos/${ownerRepository}/branches`;
+    let url = `https://api.github.com/repos/${data.ownerRepository}/branches`;
     if (config.informationMessages === 'verbose') {
         vscode.window.showInformationMessage(`GitHubFileFetcher (2/6): Fetching branches from "${url}".`);
     }
 
-    response = await fetch(url, options);
-    json = await response.json();
+    let response = await fetch(url, options);
+    let json: any = await response.json();
     let branches: string[] = [];
 
     if (json.message) {
@@ -252,7 +334,7 @@ async function getBranch(context: vscode.ExtensionContext) {
         branches.push(json[key].name);
     });
 
-    branch = await vscode.window.showQuickPick(branches.reverse(), {
+    let branch = await vscode.window.showQuickPick(branches.reverse(), {
         title: 'GitHubFileFetcher (2/6)',
         placeHolder: 'GitHubFileFetcher: Select branch...',
         canPickMany: false,
@@ -261,17 +343,22 @@ async function getBranch(context: vscode.ExtensionContext) {
     return branch;
 }
 
-async function getFile(context: vscode.ExtensionContext) {
+/**
+ * Fetches files from a GitHub repository based on the provided owner, repository, and branch.
+ * @param data - An object containing the ownerRepository and branch information.
+ * @returns A Promise that resolves to the selected file path or undefined if no file is selected.
+ */
+async function getFile(data: { ownerRepository: any; branch: any; }) {
 
     // Get all possible files.
-    url = `https://api.github.com/repos/${ownerRepository}/git/trees/${branch}?recursive=1`;
+    let url = `https://api.github.com/repos/${data.ownerRepository}/git/trees/${data.branch}?recursive=1`;
 
     if (config.informationMessages === 'verbose') {
         vscode.window.showInformationMessage(`GitHubFileFetcher (3/6): Fetching files from "${url}".`);
     }
 
-    response = await fetch(url, options);
-    json = await response.json();
+    let response = await fetch(url, options);
+    let json: any = await response.json();
     let files: string[] = [];
 
     if (json.message) {
@@ -293,7 +380,12 @@ async function getFile(context: vscode.ExtensionContext) {
     return file;
 }
 
-async function getWorkspaceFolder(context: vscode.ExtensionContext) {
+/**
+ * Retrieves the selected workspace folder from the user.
+ *
+ * @returns A Promise that resolves to the selected workspace folder path, or undefined if no workspace folder is selected.
+ */
+async function getWorkspaceFolder() {
 
     // Get all workspace folders.
     let workspaceFolders: string[] = [];
@@ -314,22 +406,29 @@ async function getWorkspaceFolder(context: vscode.ExtensionContext) {
     }
 
     return workspaceFolder;
-
 }
 
-async function getDestinationFilePath(context: vscode.ExtensionContext) {
+/**
+ * Retrieves the destination file path and checks if it already exists.
+ * If the file already exists, it prompts the user to confirm overwriting.
+ * If the file does not exist or the user chooses not to overwrite, it prompts for a new destination file path.
+ * @param data - An object containing the file and workspace folder information.
+ * @returns An object with the destination file name and path.
+ */
+async function getDestination(data: { file: any; workspaceFolder: any; }) {
 
     let destinationFile = await vscode.window.showInputBox({
         title: 'GitHubFileFetcher (5/6)',
         placeHolder: `GitHubFileFetcher: Enter or change destination file path...`,
-        value: file,
+        value: data.file,
         prompt: `GitHubFileFetcher: Enter or change destination file path...`,
-    });
+    }) as string;
 
-    destinationFilePath = vscode.Uri.file(workspaceFolder + '/' + destinationFile);
+    let destinationFilePath = vscode.Uri.file(data.workspaceFolder + '/' + destinationFile);
 
     let overwriteExistingFile = false;
-    if (await vscode.workspace.fs.stat(destinationFilePath)) {
+    try {
+        await vscode.workspace.fs.stat(destinationFilePath);
 
         let confirmOverwrite = await vscode.window.showQuickPick(['yes', 'no'], {
             title: 'GitHubFileFetcher (Overwrite)',
@@ -338,6 +437,13 @@ async function getDestinationFilePath(context: vscode.ExtensionContext) {
         });
         if (confirmOverwrite === 'yes') {
             overwriteExistingFile = true;
+        }
+    } catch (error) {
+        if (error instanceof vscode.FileSystemError && error.code === 'FileNotFound') {
+            // File does not exist, continue without overwriting
+        } else {
+            // Re-throw the error if it's not a FileNotFound error
+            throw error;
         }
     }
 
@@ -359,10 +465,10 @@ async function getDestinationFilePath(context: vscode.ExtensionContext) {
             destinationFile = await vscode.window.showInputBox({
                 title: 'GitHubFileFetcher (5/6)',
                 placeHolder: `GitHubFileFetcher: Enter or change destination file path...`,
-                value: file,
+                value: data.file,
                 prompt: `GitHubFileFetcher: Enter or change destination file path...`,
-            });
-            destinationFilePath = vscode.Uri.file(workspaceFolder + '/' + destinationFile);
+            }) as string;
+            destinationFilePath = vscode.Uri.file(data.workspaceFolder + '/' + destinationFile);
         }
     }
 
@@ -371,52 +477,85 @@ async function getDestinationFilePath(context: vscode.ExtensionContext) {
         return;
     }
 
-    return destinationFilePath;
+    return {
+        destinationFile: destinationFile,
+        destinationFilePath: destinationFilePath,
+    };
 }
 
-async function fetchFile(context: vscode.ExtensionContext) {
+/**
+ * Fetches a file from a GitHub repository.
+ * @param data - An object containing the owner and repository name, file path, and branch name.
+ * @returns A Promise that resolves to the file content as a Uint8Array.
+ */
+async function fetchFile(data: { ownerRepository: any; file: any; branch: any; }) {
 
 // Get file data.
-    url = `https://api.github.com/repos/${ownerRepository}/contents/${file}?ref=${branch}`;
+    let url = `https://api.github.com/repos/${data.ownerRepository}/contents/${data.file}?ref=${data.branch}`;
 
-    // Log.
     if (config.informationMessages === 'verbose') {
-        vscode.window.showInformationMessage(`GitHubFileFetcher (6/6): Fetching file data for file: "${file}" from branch: "${branch}" from url: "${url}".`);
+        vscode.window.showInformationMessage(`GitHubFileFetcher (6/6): Fetching file data for file: "${data.file}" from branch: "${data.branch}" from url: "${url}".`);
     }
 
-    response = await fetch(url, options);
-    json = await response.json();
+    let response = await fetch(url, options);
+    let json: any = await response.json();
     if (json.message) {
         vscode.window.showErrorMessage(`GitHubFileFetcher (6/6): ${json.message}.`);
         return;
     }
 
     const writeBytes = toUint8Array(json.content);
-    fileContent = new Uint8Array(writeBytes);
+    let fileContent = new Uint8Array(writeBytes);
 
     if (!fileContent) {
         vscode.window.showErrorMessage(`GitHubFileFetcher (6/6): No file content exists.`);
         return;
     }
 
-    // Log.
     if (config.informationMessages === 'verbose') {
-        vscode.window.showInformationMessage(`GitHubFileFetcher (6/6): Decoded file: "${file}" from branch: "${branch}".`);
+        vscode.window.showInformationMessage(`GitHubFileFetcher (6/6): Decoded file: "${data.file}" from branch: "${data.branch}".`);
     }
 
     return fileContent;
 }
 
-async function addFile(context: vscode.ExtensionContext) {
+/**
+ * Adds a file to the specified destination path with the given content.
+ * @param data - An object containing the destination file path and the content of the file.
+ */
+async function addFile(data: { destinationFilePath: any; fileContent: any; }) {
     try {
-        await vscode.workspace.fs.writeFile(destinationFilePath, fileContent);
+        await vscode.workspace.fs.writeFile(data.destinationFilePath, data.fileContent);
     } catch (err) {
         console.error(err);
         vscode.window.showErrorMessage(`GitHubFileFetcher (6/6): ${err}.`);
     }
 }
 
-async function addNewRepoToSetting(context: vscode.ExtensionContext) {
+/**
+ * Retrieves the latest commit ID for a specific file in a GitHub repository.
+ *
+ * @param context - The extension context.
+ * @returns The latest commit ID.
+ */
+async function getLatestCommitId(data: { ownerRepository: any; branch: any; file: any; }) {
+
+    // Get commits
+    let url = `https://api.github.com/repos/${data.ownerRepository}/commits?path=${data.file};sha=${data.branch}`;
+    let response = await fetch(url, options);
+
+    let commits: any[] = await response.json() as any[];
+    if (!commits) { return; }
+
+    let latestCommitId: string = commits[0].sha;
+    return latestCommitId;
+}
+
+/**
+ * Adds a new repository to the settings if the user chooses to save it.
+ * @param data - The data containing the owner and repository information.
+ */
+async function addNewRepoToSetting(data: { ownerRepository: any }) {
 
     if (!newRepoFound) { return; }
 
@@ -429,9 +568,106 @@ async function addNewRepoToSetting(context: vscode.ExtensionContext) {
     if (addNewRepoToSetting === 'yes') {
 
         let configRepositories = config.repositories;
-        configRepositories.push(ownerRepository);
+        configRepositories.push(data.ownerRepository);
 
         await vscode.workspace.getConfiguration().update('gitHubFileFetcher.repositories', configRepositories, true);
+    }
+}
+
+/**
+ * Stores the workspace folders.
+ * @param {vscode.ExtensionContext} context - The extension context.
+ * @returns {Promise<void>} - A promise that resolves when the workspace folders are stored.
+ */
+async function setWorkspaceFolders(context: vscode.ExtensionContext, data: any) {
+
+    if (!config.history) { return; }
+    let workspaceFolders: any = await getWorkspaceFolders(context);
+
+    if (!workspaceFolders) {
+        workspaceFolders = {};
+    }
+
+    let workspaceFolder = data.workspaceFolder;
+    let destinationFile = data.destinationFile;
+    let ownerRepository = data.ownerRepository;
+    let branch = data.branch;
+    let file = data.file;
+
+    let latestCommitId = await getLatestCommitId({ ownerRepository: ownerRepository, branch: branch, file: file, });
+
+    workspaceFolders[workspaceFolder] = workspaceFolders[workspaceFolder] || {};
+    workspaceFolders[workspaceFolder][destinationFile] = workspaceFolders[workspaceFolder][destinationFile] || {};
+
+    workspaceFolders[workspaceFolder][destinationFile]['ownerRepository'] = ownerRepository;
+    workspaceFolders[workspaceFolder][destinationFile]['branch'] = branch;
+    workspaceFolders[workspaceFolder][destinationFile]['file'] = file;
+    workspaceFolders[workspaceFolder][destinationFile]['commitId'] = latestCommitId;
+    workspaceFolders[workspaceFolder][destinationFile]['timestamp'] = new Date().toISOString();
+
+    await context.globalState.update('gitHubFileFetcher.workspaceFolders', JSON.stringify(workspaceFolders));
+}
+
+/**
+ * Retrieves the stored workspace folders.
+ * @param {vscode.ExtensionContext} context - The extension context.
+ * @returns {Promise<any>} - A promise that resolves to the stored workspace folders.
+ */
+async function getWorkspaceFolders(context: vscode.ExtensionContext) {
+
+    let workspaceFoldersJson: any = await context.globalState.get('gitHubFileFetcher.workspaceFolders') || '{}';
+    let workspaceFolders = JSON.parse(workspaceFoldersJson);
+
+    return workspaceFolders;
+}
+
+/**
+ * Checks for updates and displays a warning message
+ * if the current active file is not up to date.
+ *
+ * @param context - The extension context.
+ */
+async function checkForUpdates(context: vscode.ExtensionContext) {
+
+    let workspaceFolders = await getWorkspaceFolders(context);
+    if (!workspaceFolders) { return; }
+
+    options = getOptions();
+
+    let activeEditor = vscode.window.activeTextEditor;
+    if (activeEditor) {
+
+        let workspaceFolder = vscode.workspace.getWorkspaceFolder(activeEditor.document.uri)?.uri.fsPath;
+        let filePath = activeEditor.document.uri.fsPath;
+        let relativePath = vscode.workspace.asRelativePath(filePath);
+
+        if (!relativePath) { return; }
+
+        if (workspaceFolder && workspaceFolders[workspaceFolder] && workspaceFolders[workspaceFolder][relativePath]) {
+
+            let ownerRepository = workspaceFolders[workspaceFolder][relativePath].ownerRepository;
+            let branch = workspaceFolders[workspaceFolder][relativePath].branch;
+            let file = workspaceFolders[workspaceFolder][relativePath].file;
+
+            let commitId = workspaceFolders[workspaceFolder][relativePath].commitId;
+            let latestCommitId = await getLatestCommitId({ ownerRepository: ownerRepository, branch: branch, file: file });
+
+            let shortCommitId = commitId.substring(0, 7);
+            let shortLatestCommitId = latestCommitId?.substring(0, 7) ?? '';
+
+            if (latestCommitId && commitId && latestCommitId !== commitId) {
+                vscode.window.showWarningMessage(`GitHubFileFetcher: File is not up to date. | File: ${file} | Owner/Repository: ${ownerRepository} | Branch: ${branch} | Fetched CommitID: ${shortCommitId}. | Latest CommitID: ${shortLatestCommitId}`);
+            }
+            else {
+                if (config.checkForUpdatesMessages === 'verbose') {
+                    vscode.window.showInformationMessage(`GitHubFileFetcher: File is up to date. | File: ${file} | Owner/Repository: ${ownerRepository} | Branch: ${branch} | Fetched CommitID: ${shortCommitId}. | Latest CommitID: ${shortLatestCommitId}`);
+                }
+            }
+        }
+
+    } else {
+        // TODO: Show stored Workspace Folders
+        console.log("No active editor");
     }
 }
 

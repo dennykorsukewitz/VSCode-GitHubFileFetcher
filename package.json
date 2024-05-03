@@ -76,15 +76,20 @@
   "contributes": {
     "commands": [
       {
-        "command": "gitHubFileFetcher",
+        "command": "gitHubFileFetcher.start",
         "title": "Searches and fetches files from GitHub.",
+        "category": "GitHubFileFetcher"
+      },
+      {
+        "command": "gitHubFileFetcher.checkForUpdates",
+        "title": "Check for Updates",
         "category": "GitHubFileFetcher"
       }
     ],
     "keybindings": [
       {
-        "command": "gitHubFileFetcher",
-        "key": "ctrl+alt+k f"
+        "command": "gitHubFileFetcher.start",
+        "key": "ctrl+alt+g s"
       }
     ],
     "configuration": {
@@ -107,8 +112,34 @@
             "Yes, all the information will be displayed."
           ]
         },
-        "gitHubFileFetcher.repositories": {
+        "gitHubFileFetcher.history": {
           "order": 2,
+          "type": "boolean",
+          "description": "Controls whether 'GitHub File Fetcher' history is enabled. When enabled, the 'workspace folder', 'destination file', 'owner/repository', 'branch', 'file', 'commit id' and 'UTC timestamp' of the fetched file will be stored to global state 'gitHubFileFetcher.workspaceFolders'.",
+          "default": true
+        },
+        "gitHubFileFetcher.checkForUpdates": {
+          "order": 3,
+          "type": "boolean",
+          "description": "Checks for updates and displays a information (or warning) message if the current active file is (or is not) up to date. Only works if the 'gitHubFileFetcher.history' setting was previously active.",
+          "default": true
+        },
+        "gitHubFileFetcher.checkForUpdatesMessages": {
+          "order": 4,
+          "type": "string",
+          "description": "Defines which messages are displayed.",
+          "default": "verbose",
+          "enum": [
+            "warning",
+            "verbose"
+          ],
+          "enumDescriptions": [
+            "Only warnings are displayed.",
+            "Warnings and information are displayed."
+          ]
+        },
+        "gitHubFileFetcher.repositories": {
+          "order": 5,
           "type": "array",
           "items": {
             "type": "string"
@@ -119,12 +150,12 @@
           ]
         },
         "gitHubFileFetcher.githubUsername": {
-          "order": 3,
+          "order": 6,
           "type": "string",
           "description": "The GitHub API is limited to 60 requests per hour for non authorized requests. You can provide your GitHub username and an access token to push this limit to 5000 requests per hour."
         },
         "gitHubFileFetcher.githubToken": {
-          "order": 4,
+          "order": 7,
           "type": "string",
           "description": "The GitHub API is limited to 60 requests per hour for non authorized requests. You can provide your GitHub username and an access token to push this limit to 5000 requests per hour."
         }
