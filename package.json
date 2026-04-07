@@ -2,7 +2,7 @@
   "name": "GitHubFileFetcher",
   "displayName": "GitHub File Fetcher",
   "description": "This extension searches and fetches files from GitHub.",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "publisher": "dennykorsukewitz",
   "icon": "doc/images/icon.png",
   "license": "SEE LICENSE IN LICENSE",
@@ -48,8 +48,8 @@
     "watch": "tsc -watch -p ./",
     "build": "tsc -p ./",
     "build-web": "npm run esbuild-base -- --sourcemap",
-    "lint": "eslint src --ext ts",
-    "lint-fix": "eslint src --ext ts --fix",
+    "lint": "eslint src",
+    "lint-fix": "eslint src --fix",
     "pretest": "rm -Rf .vscode-test && npm run build && npm run lint",
     "test": "node ./dist/test/runTest.js",
     "open-in-browser": "npm run build-web && npx @vscode/test-web --extensionDevelopmentPath=."
@@ -64,8 +64,10 @@
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^8.25.0",
     "@typescript-eslint/parser": "^8.25.0",
+    "@vscode/test-electron": "^2.5.2",
     "esbuild": "^0.25.0",
     "eslint": "^9.21.0",
+    "eslint-plugin-n": "^17.15.1",
     "mocha": "^11.1.0",
     "typescript": "^5.3.3"
   },
@@ -76,20 +78,128 @@
   "contributes": {
     "commands": [
       {
-        "command": "gitHubFileFetcher.start",
+        "command": "gitHubFileFetcher.run",
         "title": "Searches and fetches files from GitHub.",
         "category": "GitHubFileFetcher"
       },
       {
         "command": "gitHubFileFetcher.checkForUpdates",
-        "title": "Check for Updates",
+        "title": "Check current file for updates",
         "category": "GitHubFileFetcher"
+      },
+      {
+        "command": "gitHubFileFetcher.fetchHistory.show",
+        "title": "Show Stored Fetch History in a new file",
+        "category": "GitHubFileFetcher"
+      },
+      {
+        "command": "gitHubFileFetcher.fetchHistory.clear",
+        "title": "Clear Stored Fetch History",
+        "category": "GitHubFileFetcher"
+      },
+      {
+        "command": "gitHubFileFetcher.fetchHistory.add",
+        "title": "Add",
+        "category": "GitHubFileFetcher",
+        "icon": "$(add)"
+      },
+      {
+        "command": "gitHubFileFetcher.fetchHistory.refresh",
+        "title": "Refresh",
+        "category": "GitHubFileFetcher",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "gitHubFileFetcher.fetchHistory.removeFile",
+        "title": "Remove File from Fetch History",
+        "category": "GitHubFileFetcher",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "gitHubFileFetcher.fetchHistory.removeWorkspace",
+        "title": "Remove Workspace from Fetch History",
+        "category": "GitHubFileFetcher",
+        "icon": "$(trash)"
+      },
+      {
+        "command": "gitHubFileFetcher.fetchHistory.removeMissing",
+        "title": "Remove Missing Files from Fetch History",
+        "category": "GitHubFileFetcher",
+        "icon": "$(warning)"
       }
     ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "gitHubFileFetcher.fetchHistory.add",
+          "when": "false"
+        },
+        {
+          "command": "gitHubFileFetcher.fetchHistory.refresh",
+          "when": "false"
+        },
+        {
+          "command": "gitHubFileFetcher.fetchHistory.removeFile",
+          "when": "false"
+        },
+        {
+          "command": "gitHubFileFetcher.fetchHistory.removeWorkspace",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "gitHubFileFetcher.fetchHistory.add",
+          "when": "view == gitHubFileFetcher.fetchHistory",
+          "group": "navigation@1"
+        },
+        {
+          "command": "gitHubFileFetcher.fetchHistory.refresh",
+          "when": "view == gitHubFileFetcher.fetchHistory",
+          "group": "navigation@2"
+        },
+        {
+          "command": "gitHubFileFetcher.fetchHistory.removeMissing",
+          "when": "view == gitHubFileFetcher.fetchHistory",
+          "group": "navigation@3"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "gitHubFileFetcher.fetchHistory.removeFile",
+          "when": "view == gitHubFileFetcher.fetchHistory && viewItem == fetchHistoryFile",
+          "group": "1_modify"
+        },
+        {
+          "command": "gitHubFileFetcher.fetchHistory.removeWorkspace",
+          "when": "view == gitHubFileFetcher.fetchHistory && viewItem == fetchHistoryWorkspace",
+          "group": "1_modify"
+        }
+      ]
+    },
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "gitHubFileFetcher",
+          "title": "GitHub File Fetcher",
+          "icon": "resources/icon.svg"
+        }
+      ]
+    },
+    "views": {
+      "gitHubFileFetcher": [
+        {
+          "id": "gitHubFileFetcher.fetchHistory",
+          "name": "Fetch History",
+          "contextualTitle": "GitHub Fetch History"
+        }
+      ]
+    },
     "keybindings": [
       {
-        "command": "gitHubFileFetcher.start",
-        "key": "ctrl+alt+g s"
+        "command": "gitHubFileFetcher.run",
+        "key": "alt+shift+g",
+        "mac": "alt+cmd+g"
       }
     ],
     "configuration": {
@@ -112,34 +222,42 @@
             "Yes, all the information will be displayed."
           ]
         },
-        "gitHubFileFetcher.history": {
+        "gitHubFileFetcher.fetchHistory": {
           "order": 2,
           "type": "boolean",
-          "description": "Controls whether 'GitHub File Fetcher' history is enabled. When enabled, the 'workspace folder', 'destination file', 'owner/repository', 'branch', 'file', 'commit id' and 'UTC timestamp' of the fetched file will be stored to global state 'gitHubFileFetcher.workspaceFolders'.",
+          "description": "Controls whether 'GitHub File Fetcher' fetch history is enabled. When enabled, the 'workspace folder', 'destination file', 'owner/repository', 'branch', 'file', 'commit id' and 'UTC timestamp' of the fetched file will be stored to global state 'gitHubFileFetcher.workspaceFolders'.",
           "default": true
         },
         "gitHubFileFetcher.checkForUpdates": {
           "order": 3,
           "type": "boolean",
-          "description": "Checks for updates and displays a information (or warning) message if the current active file is (or is not) up to date. Only works if the 'gitHubFileFetcher.history' setting was previously active.",
+          "description": "When enabled, compares the active file to GitHub if a fetch history entry exists (see gitHubFileFetcher.fetchHistory). Notifications always include up-to-date and out-of-date results; use gitHubFileFetcher.checkForUpdatesMessages for short vs detailed text.",
           "default": true
         },
         "gitHubFileFetcher.checkForUpdatesMessages": {
           "order": 4,
           "type": "string",
-          "description": "Defines which messages are displayed.",
-          "default": "verbose",
+          "description": "How much detail to show when comparing the file to GitHub (after fetch history was stored). With \"verbose\", automatic checks (switching editors) use a short toast; run the \"Check for Updates\" command for a modal with full multi-line details.",
+          "default": "default",
           "enum": [
-            "warning",
+            "default",
             "verbose"
           ],
           "enumDescriptions": [
-            "Only warnings are displayed.",
-            "Warnings and information are displayed."
+            "Short notifications only (always, including when up to date).",
+            "Short toast when the editor changes; full details in a modal dialog when you run \"Check for Updates\"."
           ]
         },
-        "gitHubFileFetcher.repositories": {
+        "gitHubFileFetcher.checkForUpdatesHintSeconds": {
           "order": 5,
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "maximum": 120,
+          "description": "How long (in seconds) to keep the short compare result visible in the notification area before it closes. At 0, uses a standard information or warning toast (VS Code decides when it hides). Above 0, uses a timed notification (VS Code cannot auto-dismiss showInformationMessage/showWarningMessage on a custom schedule)."
+        },
+        "gitHubFileFetcher.repositories": {
+          "order": 6,
           "type": "array",
           "items": {
             "type": "string"
@@ -150,12 +268,12 @@
           ]
         },
         "gitHubFileFetcher.githubUsername": {
-          "order": 6,
+          "order": 7,
           "type": "string",
           "description": "The GitHub API is limited to 60 requests per hour for non authorized requests. You can provide your GitHub username and an access token to push this limit to 5000 requests per hour."
         },
         "gitHubFileFetcher.githubToken": {
-          "order": 7,
+          "order": 8,
           "type": "string",
           "description": "The GitHub API is limited to 60 requests per hour for non authorized requests. You can provide your GitHub username and an access token to push this limit to 5000 requests per hour."
         }

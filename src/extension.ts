@@ -1,4 +1,6 @@
 import * as vscode from 'vscode';
+import { createFetchHistoryTreeView, refreshFetchHistoryTree } from './fetchHistoryTree';
+import { fetchLatestCommitSha } from './githubCommits';
 
 const toUint8Array = require('base64-to-uint8array');
 
@@ -8,7 +10,8 @@ let newRepoFound: Boolean = false,
     options: any = {},
     config = vscode.workspace.getConfiguration('gitHubFileFetcher'),
     repositories = Object.assign([], config.repositories);
-;
+
+let outdatedFileStatusBarItem: vscode.StatusBarItem | undefined;
 
 /**
  * Activates the extension and registers commands and event listeners.
@@ -17,18 +20,29 @@ let newRepoFound: Boolean = false,
 export function activate(context: vscode.ExtensionContext) {
 
     /**
-     * Command to start the GitHub File Fetcher.
+     * Command to run the GitHub File Fetcher workflow.
      * This function searches and fetches files from GitHub.
      */
-    let startCommand = vscode.commands.registerCommand('gitHubFileFetcher.start', () => {
-        startGitHubFileFetcher(context);
+    let runCommand = vscode.commands.registerCommand('gitHubFileFetcher.run', () => {
+        runGitHubFileFetcher(context);
     });
 
     /**
      * Command to check for updates.
      */
     let checkForUpdatesCommand = vscode.commands.registerCommand('gitHubFileFetcher.checkForUpdates', () => {
-        checkForUpdates(context);
+        checkForUpdates(context, true);
+    });
+
+    /**
+     * Opens the persisted fetch metadata (globalState) as JSON for inspection (e.g. debugging history / check-for-updates).
+     */
+    let showHistoryCommand = vscode.commands.registerCommand('gitHubFileFetcher.fetchHistory.show', () => {
+        showHistory(context);
+    });
+
+    let clearHistoryCommand = vscode.commands.registerCommand('gitHubFileFetcher.fetchHistory.clear', () => {
+        clearHistory(context);
     });
 
     /**
@@ -43,7 +57,28 @@ export function activate(context: vscode.ExtensionContext) {
         }
     });
 
-    context.subscriptions.push(startCommand, checkForUpdatesCommand, checkForUpdatesOnDidChangeActiveTextEditor);
+    outdatedFileStatusBarItem = vscode.window.createStatusBarItem(
+        'gitHubFileFetcher.outdatedIndicator',
+        vscode.StatusBarAlignment.Right,
+        100,
+    );
+    outdatedFileStatusBarItem.name = 'GitHub File Fetcher';
+    outdatedFileStatusBarItem.text = '$(warning) $(cloud-download) GitHub';
+    outdatedFileStatusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+    outdatedFileStatusBarItem.color = new vscode.ThemeColor('statusBarItem.errorForeground');
+    outdatedFileStatusBarItem.command = 'gitHubFileFetcher.checkForUpdates';
+    outdatedFileStatusBarItem.hide();
+
+    createFetchHistoryTreeView(context, () => getOptions());
+
+    context.subscriptions.push(
+        runCommand,
+        checkForUpdatesCommand,
+        showHistoryCommand,
+        clearHistoryCommand,
+        checkForUpdatesOnDidChangeActiveTextEditor,
+        outdatedFileStatusBarItem,
+    );
 
     // Listen for configuration changes
     handleConfigChange();
@@ -55,7 +90,7 @@ export function activate(context: vscode.ExtensionContext) {
  * @param context - The extension context.
  * @returns A promise that resolves when the extension has finished running.
  */
-async function startGitHubFileFetcher(context: vscode.ExtensionContext) {
+async function runGitHubFileFetcher(context: vscode.ExtensionContext) {
 
     newRepoFound = false;
     options = getOptions();
@@ -194,14 +229,14 @@ function pre() {
 }
 
 /**
-* Listen for configuration change in `gitHubFileFetcher.history` or `gitHubFileFetcher.checkForUpdates` section
+* Listen for configuration change in `gitHubFileFetcher.fetchHistory` or `gitHubFileFetcher.checkForUpdates` section
 * When anything changes in the section, show a prompt to reload
 * VSCode window via `workbench.action.reloadWindow` command
 */
 function handleConfigChange() {
     vscode.workspace.onDidChangeConfiguration(configChangeEvent => {
 
-        if (configChangeEvent.affectsConfiguration('gitHubFileFetcher.history') || configChangeEvent.affectsConfiguration('gitHubFileFetcher.checkForUpdates')) {
+        if (configChangeEvent.affectsConfiguration('gitHubFileFetcher.fetchHistory') || configChangeEvent.affectsConfiguration('gitHubFileFetcher.checkForUpdates')) {
         const actions = ['Reload now', 'Later'];
 
         vscode.window.showInformationMessage('The VSCode window needs to reload for the changes to take effect. Would you like to reload the window now?', ...actions)
@@ -391,7 +426,7 @@ async function getWorkspaceFolder() {
     let workspaceFolders: string[] = [];
     if (vscode.workspace.workspaceFolders) {
         vscode.workspace.workspaceFolders.forEach(workspaceFolder => {
-            workspaceFolders.push(workspaceFolder.uri.path);
+            workspaceFolders.push(workspaceFolder.uri.fsPath);
         });
     }
 
@@ -540,15 +575,7 @@ async function addFile(data: { destinationFilePath: any; fileContent: any; }) {
  */
 async function getLatestCommitId(data: { ownerRepository: any; branch: any; file: any; }) {
 
-    // Get commits
-    let url = `https://api.github.com/repos/${data.ownerRepository}/commits?path=${data.file};sha=${data.branch}`;
-    let response = await fetch(url, options);
-
-    let commits: any[] = await response.json() as any[];
-    if (!commits) { return; }
-
-    let latestCommitId: string = commits[0].sha;
-    return latestCommitId;
+    return fetchLatestCommitSha(data.ownerRepository, data.branch, data.file, options);
 }
 
 /**
@@ -581,7 +608,7 @@ async function addNewRepoToSetting(data: { ownerRepository: any }) {
  */
 async function setWorkspaceFolders(context: vscode.ExtensionContext, data: any) {
 
-    if (!config.history) { return; }
+    if (config.get<boolean>('fetchHistory', true) === false) { return; }
     let workspaceFolders: any = await getWorkspaceFolders(context);
 
     if (!workspaceFolders) {
@@ -606,6 +633,7 @@ async function setWorkspaceFolders(context: vscode.ExtensionContext, data: any) 
     workspaceFolders[workspaceFolder][destinationFile]['timestamp'] = new Date().toISOString();
 
     await context.globalState.update('gitHubFileFetcher.workspaceFolders', JSON.stringify(workspaceFolders));
+    refreshFetchHistoryTree();
 }
 
 /**
@@ -622,52 +650,337 @@ async function getWorkspaceFolders(context: vscode.ExtensionContext) {
 }
 
 /**
- * Checks for updates and displays a warning message
- * if the current active file is not up to date.
+ * Shows `gitHubFileFetcher.workspaceFolders` from global storage in a read-only JSON editor (preview tab).
+ */
+async function showHistory(context: vscode.ExtensionContext) {
+
+    let workspaceFolders: any;
+
+    try {
+        workspaceFolders = await getWorkspaceFolders(context);
+    } catch {
+        vscode.window.showErrorMessage('GitHubFileFetcher: Could not read fetch history from global storage (invalid JSON).');
+        return;
+    }
+
+    if (!workspaceFolders || typeof workspaceFolders !== 'object' || Object.keys(workspaceFolders).length === 0) {
+        vscode.window.showInformationMessage(
+            'GitHubFileFetcher: No fetch history in global storage. Turn on gitHubFileFetcher.fetchHistory, fetch a file, then run this command again.'
+        );
+        return;
+    }
+
+    let json = JSON.stringify(workspaceFolders, null, 2);
+    let doc = await vscode.workspace.openTextDocument({
+        content: json,
+        language: 'json',
+    });
+    await vscode.window.showTextDocument(doc, { preview: true });
+}
+
+/**
+ * Removes all entries from global storage key `gitHubFileFetcher.workspaceFolders` after confirmation.
+ */
+async function clearHistory(context: vscode.ExtensionContext) {
+
+    let confirm = await vscode.window.showWarningMessage(
+        'GitHubFileFetcher: Delete all stored fetch history? This cannot be undone.',
+        { modal: true },
+        'Clear',
+    );
+
+    if (confirm !== 'Clear') {
+        return;
+    }
+
+    await context.globalState.update('gitHubFileFetcher.workspaceFolders', undefined);
+    refreshFetchHistoryTree();
+    vscode.window.showInformationMessage('GitHubFileFetcher: Stored fetch history cleared.');
+}
+
+/**
+ * Multi-line body for modal verbose check-for-updates only (`detail` is supported when `modal: true`).
+ */
+function buildCheckForUpdatesVerboseModalDetail(data: {
+    file: string;
+    ownerRepository: string;
+    branch: string;
+    shortCommitId: string;
+    shortLatestCommitId: string;
+    outdated: boolean;
+}) {
+
+    let lines = [
+        `File: ${data.file}`,
+        `Repository: ${data.ownerRepository}`,
+        `Branch: ${data.branch}`,
+        `Fetched (stored): ${data.shortCommitId}`,
+        `Latest on GitHub: ${data.shortLatestCommitId}`,
+    ];
+
+    if (data.outdated) {
+        lines.push('');
+        lines.push('A newer commit on GitHub affects this file on the selected branch.');
+    }
+    else {
+        lines.push('');
+        lines.push('This file matches the latest commit for its path on the branch.');
+    }
+
+    return lines.join('\n');
+}
+
+function hideOutdatedFileStatusBar() {
+
+    if (outdatedFileStatusBarItem) {
+        outdatedFileStatusBarItem.hide();
+    }
+}
+
+function showOutdatedFileStatusBar(data: {
+    file: string;
+    ownerRepository: string;
+    branch: string;
+    shortCommitId: string;
+    shortLatestCommitId: string;
+}) {
+
+    if (!outdatedFileStatusBarItem) {
+        return;
+    }
+
+    outdatedFileStatusBarItem.text = `$(warning) $(cloud-download) GitHub · ${data.shortLatestCommitId}`;
+    outdatedFileStatusBarItem.backgroundColor = new vscode.ThemeColor('statusBarItem.errorBackground');
+    outdatedFileStatusBarItem.color = new vscode.ThemeColor('statusBarItem.errorForeground');
+
+    let tip = new vscode.MarkdownString(undefined, true);
+    tip.appendMarkdown('**GitHub File Fetcher** — local file is behind GitHub\n\n');
+    tip.appendMarkdown(`- **File:** \`${data.file}\`\n`);
+    tip.appendMarkdown(`- **Repository:** ${data.ownerRepository}\n`);
+    tip.appendMarkdown(`- **Branch:** \`${data.branch}\`\n`);
+    tip.appendMarkdown(`- **Fetched:** \`${data.shortCommitId}\` · **Latest:** \`${data.shortLatestCommitId}\`\n\n`);
+    tip.appendMarkdown('Click to run **Check for Updates**.');
+    outdatedFileStatusBarItem.tooltip = tip;
+    outdatedFileStatusBarItem.show();
+}
+
+/**
+ * Compares the active file to GitHub using stored history; shows a notification when out of date or up to date.
+ * Detail level is controlled by `gitHubFileFetcher.checkForUpdatesMessages` (`default` vs `verbose`).
+ * With `verbose`, the command uses a modal dialog with a multi-line `detail`; automatic checks use the same short toasts as `default` (long text in toasts wraps badly).
  *
  * @param context - The extension context.
+ * @param userInvoked - When true (command palette), explain missing history or editor; when false (tab change), stay silent if there is nothing to compare.
  */
-async function checkForUpdates(context: vscode.ExtensionContext) {
+function getCheckForUpdatesHintSeconds(): number {
+    let cfg = vscode.workspace.getConfiguration('gitHubFileFetcher');
+    let seconds = cfg.get<number>('checkForUpdatesHintSeconds');
+    if (seconds === undefined || seconds === null) {
+        let legacy = cfg.get<number>('checkForUpdatesUpToDateHintSeconds');
+        seconds = legacy !== undefined && legacy !== null ? legacy : 5;
+    }
+    return seconds;
+}
 
-    let workspaceFolders = await getWorkspaceFolders(context);
-    if (!workspaceFolders) { return; }
+/**
+ * Shows a short compare result in the notification area. `showInformationMessage` / `showWarningMessage` cannot be
+ * closed on a custom timer; when seconds > 0 we use a notification-scope progress item that ends after the delay and
+ * then disappears together with its notification.
+ */
+function showCheckForUpdatesHintNotification(message: string, severity: 'info' | 'warning') {
+    let seconds = getCheckForUpdatesHintSeconds();
+    if (seconds <= 0) {
+        if (severity === 'info') {
+            vscode.window.showInformationMessage(message);
+        }
+        else {
+            vscode.window.showWarningMessage(message);
+        }
+        return;
+    }
+    void vscode.window.withProgress(
+        {
+            location: vscode.ProgressLocation.Notification,
+            title: message,
+            cancellable: false,
+        },
+        async () => {
+            await new Promise<void>((resolve) => {
+                setTimeout(resolve, seconds * 1000);
+            });
+        },
+    );
+}
+
+function showUpToDateHint(message: string) {
+    showCheckForUpdatesHintNotification(message, 'info');
+}
+
+function showNotUpToDateHint(message: string) {
+    showCheckForUpdatesHintNotification(message, 'warning');
+}
+
+async function checkForUpdates(context: vscode.ExtensionContext, userInvoked: boolean = false) {
+
+    hideOutdatedFileStatusBar();
+
+    let workspaceFolders: any;
+
+    try {
+        workspaceFolders = await getWorkspaceFolders(context);
+    } catch {
+        if (userInvoked) {
+            vscode.window.showErrorMessage('GitHubFileFetcher: Could not read fetch history from storage.');
+        }
+        return;
+    }
+
+    let historyEmpty = !workspaceFolders || typeof workspaceFolders !== 'object' || Object.keys(workspaceFolders).length === 0;
+
+    if (historyEmpty) {
+        if (userInvoked) {
+            let historyEnabled = vscode.workspace.getConfiguration('gitHubFileFetcher').get<boolean>('fetchHistory');
+            if (historyEnabled === false) {
+                vscode.window.showInformationMessage(
+                    'GitHubFileFetcher: No fetch history in storage. Enable gitHubFileFetcher.fetchHistory, fetch a file with the extension, then try again.'
+                );
+            }
+            else {
+                vscode.window.showInformationMessage(
+                    'GitHubFileFetcher: No fetch history in storage. Fetch a file with the extension, then try again.'
+                );
+            }
+        }
+        return;
+    }
 
     options = getOptions();
 
     let activeEditor = vscode.window.activeTextEditor;
-    if (activeEditor) {
+    if (!activeEditor) {
+        if (userInvoked) {
+            vscode.window.showInformationMessage('GitHubFileFetcher: Open a file in the workspace to check for updates.');
+        }
+        return;
+    }
 
-        let workspaceFolder = vscode.workspace.getWorkspaceFolder(activeEditor.document.uri)?.uri.fsPath;
-        let filePath = activeEditor.document.uri.fsPath;
-        let relativePath = vscode.workspace.asRelativePath(filePath);
+    let workspaceFolder = vscode.workspace.getWorkspaceFolder(activeEditor.document.uri)?.uri.fsPath;
+    let filePath = activeEditor.document.uri.fsPath;
+    let relativePath = vscode.workspace.asRelativePath(filePath);
 
-        if (!relativePath) { return; }
+    if (!workspaceFolder) {
+        if (userInvoked) {
+            vscode.window.showInformationMessage('GitHubFileFetcher: The active file is not inside a workspace folder.');
+        }
+        return;
+    }
 
-        if (workspaceFolder && workspaceFolders[workspaceFolder] && workspaceFolders[workspaceFolder][relativePath]) {
+    if (!relativePath || relativePath === filePath) {
+        if (userInvoked) {
+            vscode.window.showInformationMessage('GitHubFileFetcher: Could not resolve a workspace-relative path for this file.');
+        }
+        return;
+    }
 
-            let ownerRepository = workspaceFolders[workspaceFolder][relativePath].ownerRepository;
-            let branch = workspaceFolders[workspaceFolder][relativePath].branch;
-            let file = workspaceFolders[workspaceFolder][relativePath].file;
+    let entry = workspaceFolders[workspaceFolder] && workspaceFolders[workspaceFolder][relativePath];
 
-            let commitId = workspaceFolders[workspaceFolder][relativePath].commitId;
-            let latestCommitId = await getLatestCommitId({ ownerRepository: ownerRepository, branch: branch, file: file });
+    if (!entry) {
+        if (userInvoked) {
+            vscode.window.showInformationMessage(
+                `GitHubFileFetcher: No history entry for "${relativePath}". Fetch this file with the extension while history is enabled, or use "Show Stored History" to see stored keys.`
+            );
+        }
+        return;
+    }
 
-            let shortCommitId = commitId.substring(0, 7);
-            let shortLatestCommitId = latestCommitId?.substring(0, 7) ?? '';
+    let ownerRepository = entry.ownerRepository;
+    let branch = entry.branch;
+    let file = entry.file;
+    let commitId = entry.commitId;
 
-            if (latestCommitId && commitId && latestCommitId !== commitId) {
-                vscode.window.showWarningMessage(`GitHubFileFetcher: File is not up to date. | File: ${file} | Owner/Repository: ${ownerRepository} | Branch: ${branch} | Fetched CommitID: ${shortCommitId}. | Latest CommitID: ${shortLatestCommitId}`);
+    let latestCommitId = await getLatestCommitId({ ownerRepository: ownerRepository, branch: branch, file: file });
+
+    let shortCommitId = commitId.substring(0, 7);
+    let shortLatestCommitId = latestCommitId?.substring(0, 7) ?? '';
+
+    let checkForUpdatesDetail = config.checkForUpdatesMessages as string;
+    if (checkForUpdatesDetail === 'warning') {
+        checkForUpdatesDetail = 'default';
+    }
+    let verboseCheckForUpdates = checkForUpdatesDetail === 'verbose';
+
+    if (latestCommitId && commitId && latestCommitId !== commitId) {
+        if (verboseCheckForUpdates) {
+            if (userInvoked) {
+                vscode.window.showWarningMessage(
+                    'GitHubFileFetcher: File is not up to date.',
+                    {
+                        modal: true,
+                        detail: buildCheckForUpdatesVerboseModalDetail({
+                            file,
+                            ownerRepository,
+                            branch,
+                            shortCommitId,
+                            shortLatestCommitId,
+                            outdated: true,
+                        }),
+                    },
+                    'OK',
+                );
             }
             else {
-                if (config.checkForUpdatesMessages === 'verbose') {
-                    vscode.window.showInformationMessage(`GitHubFileFetcher: File is up to date. | File: ${file} | Owner/Repository: ${ownerRepository} | Branch: ${branch} | Fetched CommitID: ${shortCommitId}. | Latest CommitID: ${shortLatestCommitId}`);
-                }
+                showNotUpToDateHint(
+                    `GitHubFileFetcher: File is not up to date. Fetched '${shortCommitId}', latest on GitHub is '${shortLatestCommitId}' (branch "${branch}"). Run "Check for Updates" for full details.`,
+                );
             }
         }
+        else {
+            showNotUpToDateHint(
+                `GitHubFileFetcher: File is not up to date. Fetched '${shortCommitId}', latest on GitHub is '${shortLatestCommitId}' (branch "${branch}").`,
+            );
+        }
 
-    } else {
-        // TODO: Show stored Workspace Folders
-        console.log("No active editor");
+        showOutdatedFileStatusBar({
+            file,
+            ownerRepository,
+            branch,
+            shortCommitId,
+            shortLatestCommitId,
+        });
+    }
+    else if (latestCommitId && commitId && latestCommitId === commitId) {
+        if (verboseCheckForUpdates) {
+            if (userInvoked) {
+                vscode.window.showInformationMessage(
+                    'GitHubFileFetcher: File is up to date.',
+                    {
+                        modal: true,
+                        detail: buildCheckForUpdatesVerboseModalDetail({
+                            file,
+                            ownerRepository,
+                            branch,
+                            shortCommitId,
+                            shortLatestCommitId,
+                            outdated: false,
+                        }),
+                    },
+                    'OK',
+                );
+            }
+            else {
+                showUpToDateHint(
+                    `GitHubFileFetcher: File is up to date. (${shortCommitId}). Run "Check for Updates" for full details.`,
+                );
+            }
+        }
+        else {
+            showUpToDateHint(`GitHubFileFetcher: File is up to date. (${shortCommitId}).`);
+        }
+    }
+    else if (userInvoked && !latestCommitId) {
+        vscode.window.showWarningMessage(
+            'GitHubFileFetcher: Could not load the latest commit from GitHub (network, rate limit, or invalid repository path).'
+        );
     }
 }
 
