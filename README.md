@@ -78,7 +78,6 @@ When **GitHub File Fetcher: Fetch History** (`gitHubFileFetcher.fetchHistory`) i
 
 ![FetchHistory](doc/images/FetchHistory.gif)
 
-
 ## Compare to GitHub (Check for updates)
 
 When **GitHub File Fetcher: Check For Updates** (`gitHubFileFetcher.checkForUpdates`) is on and the active file matches a stored history entry, the extension can compare your local file to GitHub.
